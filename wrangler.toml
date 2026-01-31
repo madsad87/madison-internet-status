@@ -13,3 +13,6 @@ crons = ["*/5 * * * *"]
 [vars]
 GITHUB_USER = "madsad87"
 UPTIME_TARGETS = "https://madisonsadler.com/"
+
+[observability]
+enabled = false
