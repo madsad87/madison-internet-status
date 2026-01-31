@@ -322,13 +322,9 @@ async function fetchPosts(env: Env, force: boolean): Promise<PostsSummary | null
 
   if (!feedUrl) {
     const summary: PostsSummary = {
-      items: [
-        { title: "On warm design systems", url: "#", published_at: null },
-        { title: "Thoughts from the lake", url: "#", published_at: null },
-        { title: "Building calm dashboards", url: "#", published_at: null },
-      ],
+      items: [],
       checked_at: now,
-      source: "placeholder",
+      source: "unconfigured",
     };
     await setLatest(env, "posts:latest", summary, now);
     return summary;
@@ -341,15 +337,45 @@ async function fetchPosts(env: Env, force: boolean): Promise<PostsSummary | null
     return summary;
   }
 
-  const payload = (await response.json()) as {
-    items?: Array<{ title?: string; url?: string; published_at?: string }>;
+  const contentType = response.headers.get("content-type") ?? "";
+  const bodyText = await response.text();
+  let items: PostsSummary["items"] = [];
+
+  const parseRssItems = (xmlText: string): PostsSummary["items"] => {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xmlText, "text/xml");
+    const rssItems = Array.from(doc.querySelectorAll("item")).slice(0, 5);
+    return rssItems.map((item) => {
+      const title = item.querySelector("title")?.textContent?.trim() ?? "Untitled";
+      const url = item.querySelector("link")?.textContent?.trim() ?? "#";
+      const pubDate = item.querySelector("pubDate")?.textContent?.trim() ?? "";
+      const publishedAt = pubDate ? Date.parse(pubDate) : NaN;
+      return {
+        title,
+        url,
+        published_at: Number.isNaN(publishedAt) ? null : Math.floor(publishedAt / 1000),
+      };
+    });
   };
 
-  const items = (payload.items ?? []).slice(0, 5).map((item) => ({
-    title: item.title ?? "Untitled",
-    url: item.url ?? "#",
-    published_at: item.published_at ? Math.floor(Date.parse(item.published_at) / 1000) : null,
-  }));
+  const isXmlContent = /(rss|xml|atom)/i.test(contentType);
+
+  if (!isXmlContent) {
+    try {
+      const payload = JSON.parse(bodyText) as {
+        items?: Array<{ title?: string; url?: string; published_at?: string }>;
+      };
+      items = (payload.items ?? []).slice(0, 5).map((item) => ({
+        title: item.title ?? "Untitled",
+        url: item.url ?? "#",
+        published_at: item.published_at ? Math.floor(Date.parse(item.published_at) / 1000) : null,
+      }));
+    } catch (error) {
+      items = parseRssItems(bodyText);
+    }
+  } else {
+    items = parseRssItems(bodyText);
+  }
 
   const summary: PostsSummary = {
     items,
