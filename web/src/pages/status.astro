@@ -1,5 +1,6 @@
 ---
 const title = "Internet Status";
+const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BASE_URL ?? "";
 ---
 <!doctype html>
 <html lang="en">
@@ -7,6 +8,7 @@ const title = "Internet Status";
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <style>
       :root {
         --color-black: #2b241b;
@@ -305,8 +307,10 @@ const title = "Internet Status";
       </div>
     </div>
 
-    <script>
-      const summaryUrl = "/api/status/summary";
+    <script define:vars={{ apiBaseUrl }}>
+      const apiRoot = apiBaseUrl ? apiBaseUrl.replace(/\/$/, "") : "";
+      const buildApiUrl = (path) => (apiRoot ? `${apiRoot}${path}` : path);
+      const summaryUrl = buildApiUrl("/api/status/summary");
       const grid = document.getElementById("status-grid");
       const modal = document.getElementById("history-modal");
       const modalTitle = document.getElementById("modal-title");
@@ -375,7 +379,9 @@ const title = "Internet Status";
         modalMeta.textContent = "Loading history…";
         modalChart.innerHTML = "";
 
-        const response = await fetch(`/api/status/history?key=${encodeURIComponent(key)}&range=24h`);
+        const response = await fetch(
+          buildApiUrl(`/api/status/history?key=${encodeURIComponent(key)}&range=24h`)
+        );
         if (!response.ok) {
           modalMeta.textContent = "Unable to load history.";
           return;
@@ -477,7 +483,7 @@ const title = "Internet Status";
           }
         }
 
-        const uptimeHistory = await fetch("/api/status/history?key=uptime:site&range=24h");
+        const uptimeHistory = await fetch(buildApiUrl("/api/status/history?key=uptime:site&range=24h"));
         if (uptimeHistory.ok) {
           const history = await uptimeHistory.json();
           const points = (history.points || []).map((point) => ({
@@ -486,7 +492,7 @@ const title = "Internet Status";
           renderSparkline(document.getElementById("uptime-sparkline"), points);
         }
 
-        const perfHistory = await fetch("/api/status/history?key=perf:site&range=24h");
+        const perfHistory = await fetch(buildApiUrl("/api/status/history?key=perf:site&range=24h"));
         if (perfHistory.ok) {
           const history = await perfHistory.json();
           const points = (history.points || []).map((point) => ({
