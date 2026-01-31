@@ -1,0 +1,15 @@
+name = "madison-internet-status"
+main = "worker/src/index.ts"
+compatibility_date = "2024-04-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "madison-status"
+database_id = "2c312d92-5f54-4408-b6ac-4c2e025250c3"
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+[vars]
+GITHUB_USER = "madsad87"
+UPTIME_TARGETS = "https://madisonsadler.com/"
