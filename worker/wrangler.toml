@@ -1,4 +1,4 @@
-name = "madison-status-worker"
+name = "madison-internet-status"
 main = "src/index.ts"
 compatibility_date = "2024-04-01"
 
