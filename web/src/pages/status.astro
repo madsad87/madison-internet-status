@@ -1,0 +1,502 @@
+---
+const title = "Internet Status";
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <style>
+      :root {
+        --color-black: #2b241b;
+        --color-primary: #8b5e3c;
+        --color-secondary: #b07a53;
+        --color-tertiary: #d9c7b2;
+        --color-white: #fbf7f0;
+        --color-background: #e7dccb;
+        --color-surface: #f3eadb;
+        --color-muted: #6f6153;
+        --color-accent: #6b4c34;
+        --color-border: #d2c1ac;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: Inter, Verdana, Arial, Helvetica, sans-serif;
+        font-weight: 400;
+        letter-spacing: 0.01em;
+        line-height: 1.6;
+        background: var(--color-background);
+        color: var(--color-black);
+      }
+
+      main {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 4rem 1.5rem 6rem;
+      }
+
+      header {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        margin-bottom: 2.5rem;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(2.1rem, 3vw, 3.2rem);
+      }
+
+      .subhead {
+        color: var(--color-muted);
+        max-width: 52ch;
+      }
+
+      .grid {
+        display: grid;
+        gap: 1.8rem;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      }
+
+      .card {
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-radius: 2rem;
+        padding: 2rem 2.2rem;
+        box-shadow: 0 18px 36px rgba(46, 34, 24, 0.08);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .card:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 22px 40px rgba(46, 34, 24, 0.12);
+      }
+
+      .card h2 {
+        margin: 0 0 1rem;
+        font-size: 1.3rem;
+      }
+
+      .metric {
+        font-variant-numeric: tabular-nums;
+        font-size: 2.1rem;
+        margin: 0;
+      }
+
+      .meta {
+        color: var(--color-muted);
+        font-size: 0.95rem;
+      }
+
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.3rem 0.9rem;
+        border-radius: 999px;
+        font-weight: 600;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        background: var(--color-tertiary);
+        color: var(--color-accent);
+      }
+
+      .status-pill.ok {
+        background: #dfe9d5;
+        color: #44512e;
+      }
+
+      .status-pill.warn {
+        background: #f2e1c5;
+        color: #7b5a2c;
+      }
+
+      .status-pill.down {
+        background: #f2c7c7;
+        color: #7c3434;
+      }
+
+      .sparkline {
+        width: 100%;
+        height: 56px;
+        margin-top: 1rem;
+      }
+
+      .list {
+        list-style: none;
+        padding: 0;
+        margin: 1rem 0 0;
+        display: grid;
+        gap: 0.75rem;
+      }
+
+      .list li {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+      }
+
+      .list a {
+        color: var(--color-accent);
+        text-decoration: none;
+        font-weight: 600;
+      }
+
+      .list a:hover {
+        text-decoration: underline;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.4rem 2.8rem;
+        border-radius: 999px;
+        border: 1px solid var(--color-primary);
+        background: var(--color-primary);
+        color: var(--color-white);
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: 0 12px 24px rgba(46, 34, 24, 0.15);
+        transition: background 0.2s ease, transform 0.2s ease;
+      }
+
+      .button:hover {
+        background: var(--color-accent);
+        transform: translateY(-1px);
+      }
+
+      .terminal-card {
+        background-color: #2d231a;
+        color: #f5e9d7;
+        padding: 2.4rem;
+        border-radius: 2rem;
+        font-family: SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
+        box-shadow: 0 24px 50px rgba(46, 34, 24, 0.25);
+      }
+
+      .terminal-card h2 {
+        margin-top: 0;
+      }
+
+      .terminal-lines {
+        margin: 1.2rem 0 0;
+        display: grid;
+        gap: 0.6rem;
+        font-size: 0.95rem;
+      }
+
+      .modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(43, 36, 27, 0.45);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        z-index: 20;
+      }
+
+      .modal.open {
+        display: flex;
+      }
+
+      .modal-panel {
+        background: var(--color-surface);
+        border-radius: 2rem;
+        border: 1px solid var(--color-border);
+        padding: 2rem;
+        width: min(720px, 100%);
+        box-shadow: 0 24px 48px rgba(46, 34, 24, 0.18);
+      }
+
+      .modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+      }
+
+      .modal-body {
+        margin-top: 1rem;
+      }
+
+      .modal-chart {
+        width: 100%;
+        height: 120px;
+      }
+
+      .loading {
+        opacity: 0.6;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Internet status</h1>
+        <p class="subhead">
+          A quiet dashboard that mirrors madisonsadler.com — checking uptime, performance, and the
+          latest updates in one calm place.
+        </p>
+      </header>
+
+      <section class="grid" id="status-grid">
+        <article class="card" data-modal-key="uptime:site">
+          <h2>Website Uptime</h2>
+          <div class="status-pill" id="uptime-status">Loading</div>
+          <p class="metric" id="uptime-latency">--</p>
+          <p class="meta" id="uptime-meta">Last check: --</p>
+          <svg class="sparkline" id="uptime-sparkline" viewBox="0 0 120 40"></svg>
+        </article>
+
+        <article class="card" data-modal-key="perf:site">
+          <h2>Performance</h2>
+          <p class="metric" id="perf-latest">--</p>
+          <p class="meta" id="perf-average">Rolling average: --</p>
+          <p class="meta" id="perf-meta">Last check: --</p>
+          <svg class="sparkline" id="perf-sparkline" viewBox="0 0 120 40"></svg>
+        </article>
+
+        <article class="card">
+          <h2>GitHub Activity</h2>
+          <p class="meta" id="github-meta">Loading…</p>
+          <ul class="list" id="github-list"></ul>
+        </article>
+
+        <article class="card">
+          <h2>Latest Posts</h2>
+          <p class="meta" id="posts-meta">Loading…</p>
+          <ul class="list" id="posts-list"></ul>
+        </article>
+
+        <article class="card">
+          <h2>Currently…</h2>
+          <p class="metric" id="now-text">Loading…</p>
+          <p class="meta" id="now-updated">--</p>
+        </article>
+
+        <article class="terminal-card">
+          <h2>Incident Log</h2>
+          <div class="terminal-lines" id="incident-log">
+            <div>Awaiting signal…</div>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <div class="modal" id="history-modal" aria-hidden="true">
+      <div class="modal-panel">
+        <div class="modal-header">
+          <h3 id="modal-title">History</h3>
+          <button class="button" id="modal-close" type="button">Close</button>
+        </div>
+        <div class="modal-body">
+          <svg class="modal-chart" id="modal-chart" viewBox="0 0 300 120"></svg>
+          <div class="meta" id="modal-meta"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const summaryUrl = "/api/status/summary";
+      const grid = document.getElementById("status-grid");
+      const modal = document.getElementById("history-modal");
+      const modalTitle = document.getElementById("modal-title");
+      const modalChart = document.getElementById("modal-chart");
+      const modalMeta = document.getElementById("modal-meta");
+
+      const formatTime = (epoch) => {
+        if (!epoch) return "--";
+        const date = new Date(epoch * 1000);
+        return date.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
+      };
+
+      const formatLatency = (value) => (value == null ? "--" : `${Math.round(value)} ms`);
+
+      const renderSparkline = (el, points, color = "#8b5e3c") => {
+        if (!el) return;
+        const width = 120;
+        const height = 40;
+        el.setAttribute("viewBox", `0 0 ${width} ${height}`);
+        if (!points.length) {
+          el.innerHTML = `<line x1="0" y1="${height / 2}" x2="${width}" y2="${height / 2}" stroke="#d2c1ac" stroke-width="2" />`;
+          return;
+        }
+        const values = points.map((p) => p.value);
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        const scale = max - min || 1;
+        const step = width / (points.length - 1 || 1);
+        const path = points
+          .map((point, index) => {
+            const x = index * step;
+            const y = height - ((point.value - min) / scale) * (height - 6) - 3;
+            return `${index === 0 ? "M" : "L"} ${x} ${y}`;
+          })
+          .join(" ");
+        el.innerHTML = `<path d="${path}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" />`;
+      };
+
+      const renderModalChart = (points) => {
+        if (!points.length) {
+          modalChart.innerHTML = "<text x=\"12\" y=\"60\" fill=\"#6f6153\">No history yet</text>";
+          return;
+        }
+        const width = 300;
+        const height = 120;
+        const values = points.map((p) => p.value);
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        const scale = max - min || 1;
+        const step = width / (points.length - 1 || 1);
+        const path = points
+          .map((point, index) => {
+            const x = index * step;
+            const y = height - ((point.value - min) / scale) * (height - 16) - 8;
+            return `${index === 0 ? "M" : "L"} ${x} ${y}`;
+          })
+          .join(" ");
+        modalChart.setAttribute("viewBox", `0 0 ${width} ${height}`);
+        modalChart.innerHTML = `<path d="${path}" fill="none" stroke="#6b4c34" stroke-width="3" stroke-linecap="round" />`;
+      };
+
+      const openModal = async (key, label) => {
+        modal.classList.add("open");
+        modal.setAttribute("aria-hidden", "false");
+        modalTitle.textContent = `${label} history`;
+        modalMeta.textContent = "Loading history…";
+        modalChart.innerHTML = "";
+
+        const response = await fetch(`/api/status/history?key=${encodeURIComponent(key)}&range=24h`);
+        if (!response.ok) {
+          modalMeta.textContent = "Unable to load history.";
+          return;
+        }
+        const data = await response.json();
+        const points = (data.points || []).map((point) => {
+          if (key === "uptime:site") {
+            const ok = point.value.status === "ok";
+            return { value: ok ? 1 : 0, time: point.recorded_at };
+          }
+          const value = point.value.response_ms ?? point.value.rolling_avg_ms ?? 0;
+          return { value, time: point.recorded_at };
+        });
+        renderModalChart(points);
+        modalMeta.textContent = `${points.length} points over 24 hours.`;
+      };
+
+      const closeModal = () => {
+        modal.classList.remove("open");
+        modal.setAttribute("aria-hidden", "true");
+      };
+
+      document.getElementById("modal-close").addEventListener("click", closeModal);
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) closeModal();
+      });
+
+      grid.addEventListener("click", (event) => {
+        const card = event.target.closest("[data-modal-key]");
+        if (!card) return;
+        const key = card.dataset.modalKey;
+        if (!key) return;
+        const label = key === "uptime:site" ? "Uptime" : "Performance";
+        openModal(key, label);
+      });
+
+      const loadSummary = async () => {
+        grid.classList.add("loading");
+        const response = await fetch(summaryUrl);
+        grid.classList.remove("loading");
+        if (!response.ok) return;
+        const data = await response.json();
+
+        if (data.uptime) {
+          const target = data.uptime.targets?.[0];
+          const statusEl = document.getElementById("uptime-status");
+          statusEl.textContent = data.uptime.status;
+          statusEl.classList.remove("ok", "warn", "down");
+          statusEl.classList.add(data.uptime.status);
+          document.getElementById("uptime-latency").textContent = formatLatency(target?.latency_ms);
+          document.getElementById("uptime-meta").textContent = `Last check: ${formatTime(data.uptime.checked_at)}`;
+        }
+
+        if (data.perf) {
+          document.getElementById("perf-latest").textContent = formatLatency(data.perf.response_ms);
+          document.getElementById("perf-average").textContent = `Rolling average: ${formatLatency(data.perf.rolling_avg_ms)}`;
+          document.getElementById("perf-meta").textContent = `Last check: ${formatTime(data.perf.checked_at)}`;
+        }
+
+        if (data.github) {
+          document.getElementById("github-meta").textContent = `Recent from @${data.github.user}`;
+          const list = document.getElementById("github-list");
+          list.innerHTML = "";
+          (data.github.items || []).slice(0, 6).forEach((item) => {
+            const li = document.createElement("li");
+            li.innerHTML = `<a href="${item.url}" target="_blank" rel="noreferrer">${item.repo}</a><span class=\"meta\">${item.message}</span>`;
+            list.appendChild(li);
+          });
+        }
+
+        if (data.posts) {
+          document.getElementById("posts-meta").textContent = data.posts.source === "placeholder" ? "Placeholder feed" : "Latest posts";
+          const list = document.getElementById("posts-list");
+          list.innerHTML = "";
+          (data.posts.items || []).forEach((item) => {
+            const li = document.createElement("li");
+            li.innerHTML = `<a href="${item.url}" target="_blank" rel="noreferrer">${item.title}</a><span class=\"meta\">${item.published_at ? formatTime(item.published_at) : "Drafting"}</span>`;
+            list.appendChild(li);
+          });
+        }
+
+        if (data.now) {
+          document.getElementById("now-text").textContent = data.now.text;
+          document.getElementById("now-updated").textContent = `Updated ${formatTime(data.now.updated_at)}`;
+        }
+
+        if (data.incidents) {
+          const container = document.getElementById("incident-log");
+          container.innerHTML = "";
+          if (data.incidents.length === 0) {
+            container.innerHTML = "<div>All quiet on the wire.</div>";
+          } else {
+            data.incidents.forEach((incident) => {
+              const row = document.createElement("div");
+              const status = incident.ended_at ? "resolved" : incident.status;
+              row.textContent = `[${status}] ${incident.target} — ${formatTime(incident.started_at)}`;
+              container.appendChild(row);
+            });
+          }
+        }
+
+        const uptimeHistory = await fetch("/api/status/history?key=uptime:site&range=24h");
+        if (uptimeHistory.ok) {
+          const history = await uptimeHistory.json();
+          const points = (history.points || []).map((point) => ({
+            value: point.value.status === "ok" ? 1 : 0,
+          }));
+          renderSparkline(document.getElementById("uptime-sparkline"), points);
+        }
+
+        const perfHistory = await fetch("/api/status/history?key=perf:site&range=24h");
+        if (perfHistory.ok) {
+          const history = await perfHistory.json();
+          const points = (history.points || []).map((point) => ({
+            value: point.value.response_ms ?? point.value.rolling_avg_ms ?? 0,
+          }));
+          renderSparkline(document.getElementById("perf-sparkline"), points, "#6b4c34");
+        }
+      };
+
+      loadSummary();
+    </script>
+  </body>
+</html>
