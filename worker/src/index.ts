@@ -419,6 +419,13 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
+    if (url.pathname === "/api/status/health") {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return new Response("Method Not Allowed", { status: 405 });
+      }
+      return jsonResponse({ ok: true });
+    }
+
     if (url.pathname === "/api/status/summary") {
       await refreshAll(env, false);
       const [uptime, perf, github, posts, nowText, incidents] = await Promise.all([
