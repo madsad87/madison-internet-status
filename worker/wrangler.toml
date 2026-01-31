@@ -13,3 +13,5 @@ crons = ["*/5 * * * *"]
 [vars]
 GITHUB_USER = "madsad87"
 UPTIME_TARGETS = "https://madisonsadler.com/"
+POSTS_FEED_URL = "https://bpheadlessb746.wpenginepowered.com/feed/"
+
