@@ -251,42 +251,42 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
       </header>
 
       <section class="grid" id="status-grid">
-        <article class="card" data-modal-key="uptime:site">
-          <h2>Website Uptime</h2>
-          <div class="status-pill" id="uptime-status">Loading</div>
+        <article class="card" data-modal-key="uptime:site" aria-labelledby="uptime-title">
+          <h2 id="uptime-title">Website Uptime</h2>
+          <div class="status-pill" id="uptime-status" role="status" aria-live="polite">Loading</div>
           <p class="metric" id="uptime-latency">--</p>
           <p class="meta" id="uptime-meta">Last check: --</p>
           <svg class="sparkline" id="uptime-sparkline" viewBox="0 0 120 40"></svg>
         </article>
 
-        <article class="card" data-modal-key="perf:site">
-          <h2>Performance</h2>
+        <article class="card" data-modal-key="perf:site" aria-labelledby="perf-title">
+          <h2 id="perf-title">Performance</h2>
           <p class="metric" id="perf-latest">--</p>
           <p class="meta" id="perf-average">Rolling average: --</p>
           <p class="meta" id="perf-meta">Last check: --</p>
           <svg class="sparkline" id="perf-sparkline" viewBox="0 0 120 40"></svg>
         </article>
 
-        <article class="card">
-          <h2>GitHub Activity</h2>
+        <article class="card" aria-labelledby="github-title">
+          <h2 id="github-title">GitHub Activity</h2>
           <p class="meta" id="github-meta">Loading…</p>
           <ul class="list" id="github-list"></ul>
         </article>
 
-        <article class="card">
-          <h2>Latest Posts</h2>
+        <article class="card" aria-labelledby="posts-title">
+          <h2 id="posts-title">Latest Posts</h2>
           <p class="meta" id="posts-meta">Loading…</p>
           <ul class="list" id="posts-list"></ul>
         </article>
 
-        <article class="card">
-          <h2>Currently…</h2>
-          <p class="metric" id="now-text">Loading…</p>
+        <article class="card" aria-labelledby="now-title">
+          <h2 id="now-title">Currently…</h2>
+          <p class="metric" id="now-text" role="status">Loading…</p>
           <p class="meta" id="now-updated">--</p>
         </article>
 
-        <article class="terminal-card">
-          <h2>Incident Log</h2>
+        <article class="terminal-card" aria-labelledby="incident-title">
+          <h2 id="incident-title">Incident Log</h2>
           <div class="terminal-lines" id="incident-log">
             <div>Awaiting signal…</div>
           </div>
