@@ -5,7 +5,7 @@ compatibility_date = "2024-04-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "madison-status"
-database_id = "YOUR_D1_DATABASE_ID"
+database_id = "2c312d92-5f54-4408-b6ac-4c2e025250c3"
 
 [triggers]
 crons = ["*/5 * * * *"]
