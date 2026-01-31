@@ -4,6 +4,7 @@ export interface Env {
   UPTIME_TARGETS?: string;
   GITHUB_USER?: string;
   POSTS_FEED_URL?: string;
+  CORS_ORIGINS?: string;
 }
 
 type MetricLatestRecord = {
@@ -61,6 +62,11 @@ const DEFAULT_TARGET = "https://madisonsadler.com/";
 const DEFAULT_GITHUB_USER = "madsad87";
 const DEFAULT_NOW_TEXT = "Tuning the signal and sipping something warm.";
 const UPDATE_FREQUENCY_SECONDS = 60 * 5;
+const DEFAULT_CORS_ORIGINS = [
+  "https://madison-internet-status.pages.dev",
+  "https://madisonsadler.com",
+  "https://www.madisonsadler.com",
+];
 
 function toEpochSeconds(date = new Date()): number {
   return Math.floor(date.getTime() / 1000);
@@ -399,11 +405,28 @@ function requireAdmin(request: Request, env: Env): Response | null {
   return null;
 }
 
-function jsonResponse(data: unknown, status = 200): Response {
+function jsonResponse(data: unknown, status = 200, extraHeaders: HeadersInit = {}): Response {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+    headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...extraHeaders },
   });
+}
+
+function getCorsHeaders(request: Request, env: Env): HeadersInit {
+  const origin = request.headers.get("Origin");
+  if (!origin) return {};
+  const envOrigins = env.CORS_ORIGINS?.split(",").map((value) => value.trim()).filter(Boolean) ?? [];
+  const allowedOrigins = new Set([...DEFAULT_CORS_ORIGINS, ...envOrigins]);
+  const isPagesPreview = origin.endsWith(".pages.dev");
+  const isAllowed = allowedOrigins.has(origin) || isPagesPreview;
+  if (!isAllowed) return {};
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Max-Age": "86400",
+    Vary: "Origin",
+  };
 }
 
 function parseRange(range: string | null): number {
@@ -418,12 +441,18 @@ function parseRange(range: string | null): number {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    const isApiRequest = url.pathname.startsWith("/api/");
+    const corsHeaders = isApiRequest ? getCorsHeaders(request, env) : {};
+
+    if (isApiRequest && request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: corsHeaders });
+    }
 
     if (url.pathname === "/api/status/health") {
       if (request.method !== "GET" && request.method !== "HEAD") {
-        return new Response("Method Not Allowed", { status: 405 });
+        return new Response("Method Not Allowed", { status: 405, headers: corsHeaders });
       }
-      return jsonResponse({ ok: true });
+      return jsonResponse({ ok: true }, 200, corsHeaders);
     }
 
     if (url.pathname === "/api/status/summary") {
@@ -437,21 +466,25 @@ export default {
         fetchIncidentLog(env),
       ]);
 
-      return jsonResponse({
-        generated_at: toEpochSeconds(),
-        uptime: uptime ? JSON.parse(uptime.value_json) : null,
-        perf: perf ? JSON.parse(perf.value_json) : null,
-        github: github ? JSON.parse(github.value_json) : null,
-        posts: posts ? JSON.parse(posts.value_json) : null,
-        now: nowText ? JSON.parse(nowText.value_json) : null,
-        incidents,
-      });
+      return jsonResponse(
+        {
+          generated_at: toEpochSeconds(),
+          uptime: uptime ? JSON.parse(uptime.value_json) : null,
+          perf: perf ? JSON.parse(perf.value_json) : null,
+          github: github ? JSON.parse(github.value_json) : null,
+          posts: posts ? JSON.parse(posts.value_json) : null,
+          now: nowText ? JSON.parse(nowText.value_json) : null,
+          incidents,
+        },
+        200,
+        corsHeaders
+      );
     }
 
     if (url.pathname === "/api/status/history") {
       const key = url.searchParams.get("key");
       if (!key) {
-        return jsonResponse({ error: "Missing key" }, 400);
+        return jsonResponse({ error: "Missing key" }, 400, corsHeaders);
       }
       const rangeSeconds = parseRange(url.searchParams.get("range"));
       const now = toEpochSeconds();
@@ -462,20 +495,24 @@ export default {
         .bind(key, since)
         .all<{ value_json: string; recorded_at: number }>();
 
-      return jsonResponse({
-        key,
-        points: history.results.map((row) => ({
-          recorded_at: row.recorded_at,
-          value: JSON.parse(row.value_json),
-        })),
-      });
+      return jsonResponse(
+        {
+          key,
+          points: history.results.map((row) => ({
+            recorded_at: row.recorded_at,
+            value: JSON.parse(row.value_json),
+          })),
+        },
+        200,
+        corsHeaders
+      );
     }
 
     if (url.pathname === "/api/admin/refresh" && request.method === "POST") {
       const auth = requireAdmin(request, env);
       if (auth) return auth;
       await refreshAll(env, true);
-      return jsonResponse({ ok: true });
+      return jsonResponse({ ok: true }, 200, corsHeaders);
     }
 
     if (url.pathname === "/api/admin/now" && request.method === "POST") {
@@ -484,12 +521,12 @@ export default {
       const body = (await request.json()) as { text?: string };
       const text = body.text?.trim();
       if (!text) {
-        return jsonResponse({ error: "Text is required" }, 400);
+        return jsonResponse({ error: "Text is required" }, 400, corsHeaders);
       }
       const now = toEpochSeconds();
       const summary: NowSummary = { text, updated_at: now };
       await setLatest(env, "now:text", summary, now);
-      return jsonResponse({ ok: true, now: summary });
+      return jsonResponse({ ok: true, now: summary }, 200, corsHeaders);
     }
 
     return new Response("Not found", { status: 404 });
