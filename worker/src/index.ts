@@ -322,13 +322,9 @@ async function fetchPosts(env: Env, force: boolean): Promise<PostsSummary | null
 
   if (!feedUrl) {
     const summary: PostsSummary = {
-      items: [
-        { title: "On warm design systems", url: "#", published_at: null },
-        { title: "Thoughts from the lake", url: "#", published_at: null },
-        { title: "Building calm dashboards", url: "#", published_at: null },
-      ],
+      items: [],
       checked_at: now,
-      source: "placeholder",
+      source: "unconfigured",
     };
     await setLatest(env, "posts:latest", summary, now);
     return summary;
