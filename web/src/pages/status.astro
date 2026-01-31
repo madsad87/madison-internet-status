@@ -60,6 +60,36 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
         max-width: 52ch;
       }
 
+      .status-banner {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem 1.2rem;
+        padding: 0.8rem 1.2rem;
+        border-radius: 1.2rem;
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        box-shadow: 0 10px 22px rgba(46, 34, 24, 0.08);
+        font-size: 0.95rem;
+      }
+
+      .status-banner strong {
+        font-weight: 600;
+        color: var(--color-accent);
+      }
+
+      .status-banner-item {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        min-width: 0;
+        flex-wrap: wrap;
+      }
+
+      .status-banner-item .meta {
+        margin: 0;
+      }
+
       .grid {
         display: grid;
         gap: 1.8rem;
@@ -244,6 +274,20 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
     <main>
       <header>
         <h1>Internet status</h1>
+        <div class="status-banner" aria-live="polite">
+          <div class="status-banner-item">
+            <span class="meta">Overall</span>
+            <span class="status-pill" id="overall-status-pill">Loading</span>
+          </div>
+          <div class="status-banner-item">
+            <span class="meta">Last updated</span>
+            <strong id="overall-updated">--</strong>
+          </div>
+          <div class="status-banner-item">
+            <span class="meta">Incidents</span>
+            <strong id="overall-incidents">--</strong>
+          </div>
+        </div>
         <p class="subhead">
           A quiet dashboard that mirrors madisonsadler.com — checking uptime, performance, and the
           latest updates in one calm place.
@@ -424,6 +468,25 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
         grid.classList.remove("loading");
         if (!response.ok) return;
         const data = await response.json();
+
+        const overallStatus = data.uptime?.status ?? "ok";
+        const statusLabel = overallStatus === "down" ? "Down" : overallStatus === "warn" ? "Warn" : "OK";
+        const overallStatusPill = document.getElementById("overall-status-pill");
+        overallStatusPill.textContent = statusLabel;
+        overallStatusPill.classList.remove("ok", "warn", "down");
+        overallStatusPill.classList.add(overallStatus);
+
+        const latestCheckedAt = Math.max(
+          data.generated_at ?? 0,
+          data.uptime?.checked_at ?? 0,
+          data.perf?.checked_at ?? 0,
+          data.now?.updated_at ?? 0
+        );
+        document.getElementById("overall-updated").textContent = formatTime(latestCheckedAt);
+
+        const incidentCount = data.incidents?.length ?? 0;
+        document.getElementById("overall-incidents").textContent =
+          incidentCount === 0 ? "All clear" : `${incidentCount} active`;
 
         if (data.uptime) {
           const target = data.uptime.targets?.[0];
