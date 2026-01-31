@@ -307,8 +307,7 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
       </div>
     </div>
 
-    <script>
-      const apiBaseUrl = {JSON.stringify(apiBaseUrl)};
+    <script define:vars={{ apiBaseUrl }}>
       const apiRoot = apiBaseUrl ? apiBaseUrl.replace(/\/$/, "") : "";
       const buildApiUrl = (path) => (apiRoot ? `${apiRoot}${path}` : path);
       const summaryUrl = buildApiUrl("/api/status/summary");
