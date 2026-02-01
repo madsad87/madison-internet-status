@@ -423,6 +423,24 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
         if (value.scores) return value.scores;
         if (value.lighthouseResult?.categories) return value.lighthouseResult.categories;
         if (value.result?.categories) return value.result.categories;
+        if (Array.isArray(value.results)) {
+          const preferred =
+            value.results.find((result) => result.strategy === "mobile") ?? value.results[0];
+          if (preferred?.categories) return preferred.categories;
+        }
+        if (
+          value.performanceScore != null ||
+          value.accessibilityScore != null ||
+          value.bestPracticesScore != null ||
+          value.seoScore != null
+        ) {
+          return {
+            performance: value.performanceScore,
+            accessibility: value.accessibilityScore,
+            "best-practices": value.bestPracticesScore,
+            seo: value.seoScore,
+          };
+        }
         return value;
       };
 
@@ -445,6 +463,12 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
 
       const resolveLighthouseScore = (value) => {
         if (!value) return null;
+        if (Array.isArray(value.results)) {
+          const preferred =
+            value.results.find((result) => result.strategy === "mobile") ?? value.results[0];
+          const categories = resolveLighthouseCategories(preferred);
+          return resolveLighthouseCategoryScore(categories, ["performance", "perf"]);
+        }
         const categories = resolveLighthouseCategories(value);
         return resolveLighthouseCategoryScore(categories, ["performance", "perf"]);
       };
