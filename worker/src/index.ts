@@ -59,11 +59,15 @@ type NowSummary = {
   updated_at: number;
 };
 
+type LighthouseCategoryScore = {
+  score: number | null;
+};
+
 type LighthouseCategoryScores = {
-  performance: number | null;
-  accessibility: number | null;
-  "best-practices": number | null;
-  seo: number | null;
+  performance: LighthouseCategoryScore;
+  accessibility: LighthouseCategoryScore;
+  "best-practices": LighthouseCategoryScore;
+  seo: LighthouseCategoryScore;
 };
 
 type LighthouseStrategySummary = {
@@ -165,6 +169,40 @@ async function fetchWithTiming(url: string): Promise<{ status: number | null; la
 function parseCategoryScore(value: unknown): number | null {
   if (typeof value !== "number") return null;
   return Math.round(value * 100);
+}
+
+function normalizeStoredCategoryScore(value: unknown): LighthouseCategoryScore {
+  if (value && typeof value === "object" && "score" in value) {
+    const score = (value as { score?: unknown }).score;
+    return { score: typeof score === "number" ? score : null };
+  }
+  if (typeof value === "number") {
+    return { score: value };
+  }
+  return { score: null };
+}
+
+function normalizeStoredCategories(
+  categories: Record<string, unknown> | undefined
+): LighthouseCategoryScores {
+  return {
+    performance: normalizeStoredCategoryScore(categories?.performance),
+    accessibility: normalizeStoredCategoryScore(categories?.accessibility),
+    "best-practices": normalizeStoredCategoryScore(categories?.["best-practices"]),
+    seo: normalizeStoredCategoryScore(categories?.seo),
+  };
+}
+
+function normalizeLighthouseSummary(summary: LighthouseSummary): LighthouseSummary {
+  return {
+    ...summary,
+    results: summary.results.map((result) => ({
+      ...result,
+      categories: normalizeStoredCategories(
+        result.categories as unknown as Record<string, unknown> | undefined
+      ),
+    })),
+  };
 }
 
 async function updateIncidentLog(
@@ -461,10 +499,13 @@ async function fetchLighthouse(env: Env, force: boolean): Promise<LighthouseSumm
   const apiKey = env.LIGHTHOUSE_API_KEY?.trim();
   const cached = await getLatest(env, "lighthouse:site");
   const cachedSummary = cached ? (JSON.parse(cached.value_json) as LighthouseSummary) : null;
+  const normalizedCachedSummary = cachedSummary
+    ? normalizeLighthouseSummary(cachedSummary)
+    : null;
 
   if (!apiKey) {
-    const summary: LighthouseSummary = cachedSummary
-      ? { ...cachedSummary, checked_at: now }
+    const summary: LighthouseSummary = normalizedCachedSummary
+      ? { ...normalizedCachedSummary, checked_at: now }
       : {
         url: target,
         status: "unconfigured",
@@ -500,10 +541,10 @@ async function fetchLighthouse(env: Env, force: boolean): Promise<LighthouseSumm
         strategy,
         checked_at: now,
         categories: {
-          performance: parseCategoryScore(categories.performance?.score),
-          accessibility: parseCategoryScore(categories.accessibility?.score),
-          "best-practices": parseCategoryScore(categories["best-practices"]?.score),
-          seo: parseCategoryScore(categories.seo?.score),
+          performance: { score: parseCategoryScore(categories.performance?.score) },
+          accessibility: { score: parseCategoryScore(categories.accessibility?.score) },
+          "best-practices": { score: parseCategoryScore(categories["best-practices"]?.score) },
+          seo: { score: parseCategoryScore(categories.seo?.score) },
         },
       };
       results.push(summary);
@@ -520,9 +561,9 @@ async function fetchLighthouse(env: Env, force: boolean): Promise<LighthouseSumm
     checked_at: now,
   };
 
-  if (results.length === 0 && cachedSummary) {
+  if (results.length === 0 && normalizedCachedSummary) {
     const fallback: LighthouseSummary = {
-      ...cachedSummary,
+      ...normalizedCachedSummary,
       status: "error",
       error: summary.error,
       checked_at: now,
