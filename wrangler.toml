@@ -14,5 +14,6 @@ crons = ["*/5 * * * *"]
 GITHUB_USER = "madsad87"
 UPTIME_TARGETS = "https://madisonsadler.com/"
 
-[observability]
+[observability.logs]
 enabled = false
+invocation_logs = true
