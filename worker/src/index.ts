@@ -4,6 +4,7 @@ export interface Env {
   UPTIME_TARGETS?: string;
   GITHUB_USER?: string;
   POSTS_FEED_URL?: string;
+  LIGHTHOUSE_API_KEY?: string;
   CORS_ORIGINS?: string;
 }
 
@@ -58,15 +59,38 @@ type NowSummary = {
   updated_at: number;
 };
 
+type LighthouseCategoryScores = {
+  performance: number | null;
+  accessibility: number | null;
+  "best-practices": number | null;
+  seo: number | null;
+};
+
+type LighthouseStrategySummary = {
+  strategy: "desktop" | "mobile";
+  categories: LighthouseCategoryScores;
+  checked_at: number;
+};
+
+type LighthouseSummary = {
+  url: string;
+  status: "ok" | "error" | "unconfigured";
+  error?: string;
+  results: LighthouseStrategySummary[];
+  checked_at: number;
+};
+
 const DEFAULT_TARGET = "https://madisonsadler.com/";
 const DEFAULT_GITHUB_USER = "madsad87";
 const DEFAULT_NOW_TEXT = "Tuning the signal and sipping something warm.";
 const UPDATE_FREQUENCY_SECONDS = 60 * 5;
+const LIGHTHOUSE_UPDATE_FREQUENCY_SECONDS = 60 * 60 * 24;
 const DEFAULT_CORS_ORIGINS = [
   "https://madison-internet-status.pages.dev",
   "https://madisonsadler.com",
   "https://www.madisonsadler.com",
 ];
+const LIGHTHOUSE_CATEGORIES = ["performance", "accessibility", "best-practices", "seo"] as const;
 
 function toEpochSeconds(date = new Date()): number {
   return Math.floor(date.getTime() / 1000);
@@ -136,6 +160,11 @@ async function fetchWithTiming(url: string): Promise<{ status: number | null; la
   } catch (error) {
     return { status: null, latency_ms: null };
   }
+}
+
+function parseCategoryScore(value: unknown): number | null {
+  if (typeof value !== "number") return null;
+  return Math.round(value * 100);
 }
 
 async function updateIncidentLog(
@@ -421,6 +450,78 @@ async function fetchNowText(env: Env): Promise<NowSummary> {
   return summary;
 }
 
+async function fetchLighthouseScores(env: Env, force: boolean): Promise<LighthouseSummary | null> {
+  if (!force && (await wasUpdatedRecently(env, "lighthouse:site", LIGHTHOUSE_UPDATE_FREQUENCY_SECONDS))) {
+    const latest = await getLatest(env, "lighthouse:site");
+    return latest ? (JSON.parse(latest.value_json) as LighthouseSummary) : null;
+  }
+
+  const now = toEpochSeconds();
+  const target = parseTargets(env)[0] ?? DEFAULT_TARGET;
+  const apiKey = env.LIGHTHOUSE_API_KEY?.trim();
+
+  if (!apiKey) {
+    const summary: LighthouseSummary = {
+      url: target,
+      status: "unconfigured",
+      error: "LIGHTHOUSE_API_KEY is not set",
+      results: [],
+      checked_at: now,
+    };
+    await setLatest(env, "lighthouse:site", summary, now);
+    await addHistory(env, "lighthouse:site", summary, now);
+    return summary;
+  }
+
+  const results: LighthouseStrategySummary[] = [];
+  const errors: string[] = [];
+  const strategies: LighthouseStrategySummary["strategy"][] = ["mobile", "desktop"];
+
+  for (const strategy of strategies) {
+    try {
+      const params = new URLSearchParams({ url: target, key: apiKey, strategy });
+      LIGHTHOUSE_CATEGORIES.forEach((category) => params.append("category", category));
+      const response = await fetch(
+        `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?${params.toString()}`
+      );
+      if (!response.ok) {
+        errors.push(`${strategy} returned ${response.status}`);
+        continue;
+      }
+      const payload = (await response.json()) as {
+        lighthouseResult?: { categories?: Record<string, { score?: number }> };
+      };
+      const categories = payload.lighthouseResult?.categories ?? {};
+      const summary: LighthouseStrategySummary = {
+        strategy,
+        checked_at: now,
+        categories: {
+          performance: parseCategoryScore(categories.performance?.score),
+          accessibility: parseCategoryScore(categories.accessibility?.score),
+          "best-practices": parseCategoryScore(categories["best-practices"]?.score),
+          seo: parseCategoryScore(categories.seo?.score),
+        },
+      };
+      results.push(summary);
+    } catch (error) {
+      errors.push(`${strategy} fetch failed`);
+    }
+  }
+
+  const summary: LighthouseSummary = {
+    url: target,
+    status: results.length > 0 && errors.length === 0 ? "ok" : "error",
+    error: errors.length ? errors.join("; ") : undefined,
+    results,
+    checked_at: now,
+  };
+
+  await setLatest(env, "lighthouse:site", summary, now);
+  await addHistory(env, "lighthouse:site", summary, now);
+
+  return summary;
+}
+
 async function fetchIncidentLog(env: Env): Promise<Array<Record<string, unknown>>> {
   const rows = await env.DB.prepare(
     "SELECT target, status, details_json, started_at, ended_at FROM incident_log ORDER BY started_at DESC LIMIT 8"
@@ -437,6 +538,7 @@ async function fetchIncidentLog(env: Env): Promise<Array<Record<string, unknown>
 async function refreshAll(env: Env, force: boolean): Promise<void> {
   await fetchUptime(env, force);
   await fetchPerformance(env, force);
+  await fetchLighthouseScores(env, force);
   await fetchGithub(env, force);
   await fetchPosts(env, force);
   await fetchNowText(env);
@@ -506,9 +608,10 @@ export default {
 
     if (url.pathname === "/api/status/summary") {
       await refreshAll(env, false);
-      const [uptime, perf, github, posts, nowText, incidents] = await Promise.all([
+      const [uptime, perf, lighthouse, github, posts, nowText, incidents] = await Promise.all([
         getLatest(env, "uptime:site"),
         getLatest(env, "perf:site"),
+        getLatest(env, "lighthouse:site"),
         getLatest(env, "github:activity"),
         getLatest(env, "posts:latest"),
         getLatest(env, "now:text"),
@@ -520,6 +623,7 @@ export default {
           generated_at: toEpochSeconds(),
           uptime: uptime ? JSON.parse(uptime.value_json) : null,
           perf: perf ? JSON.parse(perf.value_json) : null,
+          lighthouse: lighthouse ? JSON.parse(lighthouse.value_json) : null,
           github: github ? JSON.parse(github.value_json) : null,
           posts: posts ? JSON.parse(posts.value_json) : null,
           now: nowText ? JSON.parse(nowText.value_json) : null,
