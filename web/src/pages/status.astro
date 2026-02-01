@@ -417,12 +417,30 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
         return `${Math.round(normalized)}%`;
       };
 
+      const normalizeLighthouseEntries = (entries) => {
+        if (!Array.isArray(entries)) return null;
+        return entries.reduce((acc, entry) => {
+          if (!entry || typeof entry !== "object") return acc;
+          const key = entry.id ?? entry.key ?? entry.category ?? entry.name ?? entry.title;
+          if (!key) return acc;
+          acc[key] = entry.score ?? entry.value ?? entry;
+          return acc;
+        }, {});
+      };
+
       const resolveLighthouseCategories = (value) => {
         if (!value) return null;
+        if (Array.isArray(value)) return normalizeLighthouseEntries(value);
         if (value.categories) return value.categories;
         if (value.scores) return value.scores;
+        if (value.metrics) return value.metrics;
+        if (value.categories?.items) return normalizeLighthouseEntries(value.categories.items);
         if (value.lighthouseResult?.categories) return value.lighthouseResult.categories;
+        if (value.lighthouseResult?.categories?.items) {
+          return normalizeLighthouseEntries(value.lighthouseResult.categories.items);
+        }
         if (value.result?.categories) return value.result.categories;
+        if (value.result?.categories?.items) return normalizeLighthouseEntries(value.result.categories.items);
         return value;
       };
 
@@ -434,11 +452,25 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
         return value;
       };
 
+      const normalizeCategoryKey = (key) =>
+        String(key).toLowerCase().replace(/[^a-z0-9]+/g, "");
+
       const resolveLighthouseCategoryScore = (categories, keys) => {
         for (const key of keys) {
           const candidate = categories?.[key];
           const value = getScoreValue(candidate);
           if (value != null) return value;
+        }
+        if (categories && typeof categories === "object") {
+          const lookup = Object.entries(categories).reduce((acc, [key, value]) => {
+            acc[normalizeCategoryKey(key)] = value;
+            return acc;
+          }, {});
+          for (const key of keys) {
+            const candidate = lookup[normalizeCategoryKey(key)];
+            const value = getScoreValue(candidate);
+            if (value != null) return value;
+          }
         }
         return null;
       };
@@ -446,7 +478,7 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
       const resolveLighthouseScore = (value) => {
         if (!value) return null;
         const categories = resolveLighthouseCategories(value);
-        return resolveLighthouseCategoryScore(categories, ["performance", "perf"]);
+        return resolveLighthouseCategoryScore(categories, ["performance", "perf", "speed"]);
       };
 
       const formatPostsSource = (source) => {
@@ -605,7 +637,7 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
         if (data.lighthouse) {
           const categories = resolveLighthouseCategories(data.lighthouse);
           document.getElementById("lighthouse-performance").textContent = formatScore(
-            resolveLighthouseCategoryScore(categories, ["performance", "perf"])
+            resolveLighthouseCategoryScore(categories, ["performance", "perf", "speed"])
           );
           document.getElementById("lighthouse-accessibility").textContent = formatScore(
             resolveLighthouseCategoryScore(categories, ["accessibility", "a11y"])
