@@ -554,7 +554,11 @@ async function fetchIncidentLog(env: Env): Promise<Array<Record<string, unknown>
 async function refreshAll(env: Env, force: boolean): Promise<void> {
   await fetchUptime(env, force);
   await fetchPerformance(env, force);
-  await fetchLighthouse(env, force);
+  try {
+    await fetchLighthouse(env, force);
+  } catch (error) {
+    console.error("Lighthouse refresh failed", error);
+  }
   await fetchGithub(env, force);
   await fetchPosts(env, force);
   await fetchNowText(env);
