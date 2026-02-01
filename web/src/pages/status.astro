@@ -21,6 +21,8 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
         --color-muted: #6f6153;
         --color-accent: #6b4c34;
         --color-border: #d2c1ac;
+        --color-score-ring: #6fa86f;
+        --color-score-bg: #dcead3;
       }
 
       * {
@@ -173,19 +175,40 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
         margin-top: 1rem;
       }
 
-      .score-grid {
+      .metrics-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 0.75rem 1.4rem;
+        gap: 1.5rem;
+        background: var(--color-surface);
+        padding: 1.5rem;
+        border-radius: 1.5rem;
       }
 
-      .score-grid .metric {
-        font-size: 1.6rem;
-        margin: 0;
+      .metric-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        color: var(--color-black);
       }
 
-      .score-grid .meta {
-        margin: 0;
+      .metric-circle {
+        width: 84px;
+        height: 84px;
+        border-radius: 50%;
+        border: 6px solid var(--color-score-ring);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        background: var(--color-score-bg);
+      }
+
+      .metric-label {
+        font-size: 0.9rem;
+        color: var(--color-muted);
+        text-align: center;
       }
 
       .list {
@@ -330,28 +353,26 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
           <svg class="sparkline" id="uptime-sparkline" viewBox="0 0 120 40"></svg>
         </article>
 
-        <article class="card" data-modal-key="lighthouse:site" aria-labelledby="lighthouse-title">
+        <article class="card" aria-labelledby="lighthouse-title">
           <h2 id="lighthouse-title">Lighthouse Scores</h2>
-          <div class="score-grid">
-            <div>
-              <p class="meta">Performance</p>
-              <p class="metric" id="lighthouse-performance">--</p>
+          <div class="metrics-grid">
+            <div class="metric-item">
+              <div class="metric-circle">100</div>
+              <div class="metric-label">Performance</div>
             </div>
-            <div>
-              <p class="meta">Accessibility</p>
-              <p class="metric" id="lighthouse-accessibility">--</p>
+            <div class="metric-item">
+              <div class="metric-circle">90</div>
+              <div class="metric-label">Accessibility</div>
             </div>
-            <div>
-              <p class="meta">Best practices</p>
-              <p class="metric" id="lighthouse-best-practices">--</p>
+            <div class="metric-item">
+              <div class="metric-circle">100</div>
+              <div class="metric-label">Best Practices</div>
             </div>
-            <div>
-              <p class="meta">SEO</p>
-              <p class="metric" id="lighthouse-seo">--</p>
+            <div class="metric-item">
+              <div class="metric-circle">92</div>
+              <div class="metric-label">SEO</div>
             </div>
           </div>
-          <p class="meta" id="lighthouse-meta">Last audit: --</p>
-          <svg class="sparkline" id="lighthouse-sparkline" viewBox="0 0 120 40"></svg>
         </article>
 
         <article class="card" aria-labelledby="github-title">
@@ -411,67 +432,6 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
       };
 
       const formatLatency = (value) => (value == null ? "--" : `${Math.round(value)} ms`);
-      const formatScore = (value) => {
-        if (value == null) return "--";
-        const normalized = value <= 1 ? value * 100 : value;
-        return `${Math.round(normalized)}%`;
-      };
-
-      const resolveLighthouseCategories = (value) => {
-        if (!value) return null;
-        if (value.categories) return value.categories;
-        if (value.scores) return value.scores;
-        if (value.lighthouseResult?.categories) return value.lighthouseResult.categories;
-        if (value.result?.categories) return value.result.categories;
-        if (Array.isArray(value.results)) {
-          const preferred =
-            value.results.find((result) => result.strategy === "mobile") ?? value.results[0];
-          if (preferred?.categories) return preferred.categories;
-        }
-        if (
-          value.performanceScore != null ||
-          value.accessibilityScore != null ||
-          value.bestPracticesScore != null ||
-          value.seoScore != null
-        ) {
-          return {
-            performance: value.performanceScore,
-            accessibility: value.accessibilityScore,
-            "best-practices": value.bestPracticesScore,
-            seo: value.seoScore,
-          };
-        }
-        return value;
-      };
-
-      const getScoreValue = (value) => {
-        if (value == null) return null;
-        if (typeof value === "object" && "score" in value) {
-          return value.score;
-        }
-        return value;
-      };
-
-      const resolveLighthouseCategoryScore = (categories, keys) => {
-        for (const key of keys) {
-          const candidate = categories?.[key];
-          const value = getScoreValue(candidate);
-          if (value != null) return value;
-        }
-        return null;
-      };
-
-      const resolveLighthouseScore = (value) => {
-        if (!value) return null;
-        if (Array.isArray(value.results)) {
-          const preferred =
-            value.results.find((result) => result.strategy === "mobile") ?? value.results[0];
-          const categories = resolveLighthouseCategories(preferred);
-          return resolveLighthouseCategoryScore(categories, ["performance", "perf"]);
-        }
-        const categories = resolveLighthouseCategories(value);
-        return resolveLighthouseCategoryScore(categories, ["performance", "perf"]);
-      };
 
       const formatPostsSource = (source) => {
         if (!source || source === "placeholder") {
@@ -547,11 +507,6 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
             const ok = point.value.status === "ok";
             return { value: ok ? 1 : 0, time: point.recorded_at };
           }
-          if (key === "lighthouse:site") {
-            const score = resolveLighthouseScore(point.value) ?? 0;
-            const normalized = score <= 1 ? score * 100 : score;
-            return { value: normalized, time: point.recorded_at };
-          }
           const value = point.value.response_ms ?? point.value.rolling_avg_ms ?? 0;
           return { value, time: point.recorded_at };
         });
@@ -574,7 +529,7 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
         if (!card) return;
         const key = card.dataset.modalKey;
         if (!key) return;
-        const label = key === "uptime:site" ? "Uptime" : "Lighthouse performance";
+        const label = key === "uptime:site" ? "Uptime" : "Performance";
         openModal(key, label);
       });
 
@@ -595,7 +550,7 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
         const latestCheckedAt = Math.max(
           data.generated_at ?? 0,
           data.uptime?.checked_at ?? 0,
-          data.lighthouse?.checked_at ?? 0,
+          data.perf?.checked_at ?? 0,
           data.now?.updated_at ?? 0
         );
         document.getElementById("overall-updated").textContent = formatTime(latestCheckedAt);
@@ -612,29 +567,6 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
           statusEl.classList.add(data.uptime.status);
           document.getElementById("uptime-latency").textContent = formatLatency(target?.latency_ms);
           document.getElementById("uptime-meta").textContent = `Last check: ${formatTime(data.uptime.checked_at)}`;
-        }
-
-        if (data.lighthouse) {
-          const categories = resolveLighthouseCategories(data.lighthouse);
-          document.getElementById("lighthouse-performance").textContent = formatScore(
-            resolveLighthouseCategoryScore(categories, ["performance", "perf"])
-          );
-          document.getElementById("lighthouse-accessibility").textContent = formatScore(
-            resolveLighthouseCategoryScore(categories, ["accessibility", "a11y"])
-          );
-          document.getElementById("lighthouse-best-practices").textContent = formatScore(
-            resolveLighthouseCategoryScore(categories, [
-              "best_practices",
-              "bestPractices",
-              "best-practices",
-            ])
-          );
-          document.getElementById("lighthouse-seo").textContent = formatScore(
-            resolveLighthouseCategoryScore(categories, ["seo", "search"])
-          );
-          const auditedAt =
-            data.lighthouse.checked_at ?? data.lighthouse.audited_at ?? data.lighthouse.generated_at ?? 0;
-          document.getElementById("lighthouse-meta").textContent = `Last audit: ${formatTime(auditedAt)}`;
         }
 
         if (data.github) {
@@ -688,18 +620,6 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
           renderSparkline(document.getElementById("uptime-sparkline"), points);
         }
 
-        const lighthouseHistory = await fetch(
-          buildApiUrl("/api/status/history?key=lighthouse:site&range=24h")
-        );
-        if (lighthouseHistory.ok) {
-          const history = await lighthouseHistory.json();
-          const points = (history.points || []).map((point) => {
-            const score = resolveLighthouseScore(point.value) ?? 0;
-            const normalized = score <= 1 ? score * 100 : score;
-            return { value: normalized };
-          });
-          renderSparkline(document.getElementById("lighthouse-sparkline"), points, "#6b4c34");
-        }
       };
 
       loadSummary();
