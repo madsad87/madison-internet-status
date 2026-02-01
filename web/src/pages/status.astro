@@ -417,6 +417,15 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
         return `${Math.round(normalized)}%`;
       };
 
+      const resolveLighthouseCategories = (value) => {
+        if (!value) return null;
+        if (value.categories) return value.categories;
+        if (value.scores) return value.scores;
+        if (value.lighthouseResult?.categories) return value.lighthouseResult.categories;
+        if (value.result?.categories) return value.result.categories;
+        return value;
+      };
+
       const getScoreValue = (value) => {
         if (value == null) return null;
         if (typeof value === "object" && "score" in value) {
@@ -425,10 +434,19 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
         return value;
       };
 
+      const resolveLighthouseCategoryScore = (categories, keys) => {
+        for (const key of keys) {
+          const candidate = categories?.[key];
+          const value = getScoreValue(candidate);
+          if (value != null) return value;
+        }
+        return null;
+      };
+
       const resolveLighthouseScore = (value) => {
         if (!value) return null;
-        const categories = value.categories ?? value;
-        return getScoreValue(categories?.performance);
+        const categories = resolveLighthouseCategories(value);
+        return resolveLighthouseCategoryScore(categories, ["performance", "perf"]);
       };
 
       const formatPostsSource = (source) => {
@@ -585,19 +603,23 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
         }
 
         if (data.lighthouse) {
-          const categories = data.lighthouse.categories ?? data.lighthouse;
+          const categories = resolveLighthouseCategories(data.lighthouse);
           document.getElementById("lighthouse-performance").textContent = formatScore(
-            getScoreValue(categories?.performance)
+            resolveLighthouseCategoryScore(categories, ["performance", "perf"])
           );
           document.getElementById("lighthouse-accessibility").textContent = formatScore(
-            getScoreValue(categories?.accessibility)
+            resolveLighthouseCategoryScore(categories, ["accessibility", "a11y"])
           );
-          const bestPractices =
-            categories?.best_practices ?? categories?.bestPractices ?? categories?.["best-practices"];
           document.getElementById("lighthouse-best-practices").textContent = formatScore(
-            getScoreValue(bestPractices)
+            resolveLighthouseCategoryScore(categories, [
+              "best_practices",
+              "bestPractices",
+              "best-practices",
+            ])
           );
-          document.getElementById("lighthouse-seo").textContent = formatScore(getScoreValue(categories?.seo));
+          document.getElementById("lighthouse-seo").textContent = formatScore(
+            resolveLighthouseCategoryScore(categories, ["seo", "search"])
+          );
           const auditedAt =
             data.lighthouse.checked_at ?? data.lighthouse.audited_at ?? data.lighthouse.generated_at ?? 0;
           document.getElementById("lighthouse-meta").textContent = `Last audit: ${formatTime(auditedAt)}`;
