@@ -506,9 +506,10 @@ export default {
 
     if (url.pathname === "/api/status/summary") {
       await refreshAll(env, false);
-      const [uptime, perf, github, posts, nowText, incidents] = await Promise.all([
+      const [uptime, perf, lighthouse, github, posts, nowText, incidents] = await Promise.all([
         getLatest(env, "uptime:site"),
         getLatest(env, "perf:site"),
+        getLatest(env, "lighthouse:site"),
         getLatest(env, "github:activity"),
         getLatest(env, "posts:latest"),
         getLatest(env, "now:text"),
@@ -520,6 +521,7 @@ export default {
           generated_at: toEpochSeconds(),
           uptime: uptime ? JSON.parse(uptime.value_json) : null,
           perf: perf ? JSON.parse(perf.value_json) : null,
+          lighthouse: lighthouse ? JSON.parse(lighthouse.value_json) : null,
           github: github ? JSON.parse(github.value_json) : null,
           posts: posts ? JSON.parse(posts.value_json) : null,
           now: nowText ? JSON.parse(nowText.value_json) : null,
