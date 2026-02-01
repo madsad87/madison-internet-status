@@ -477,19 +477,7 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
         if (!source || source === "placeholder") {
           return "Placeholder feed";
         }
-        const trimmed = source.trim();
-        let host = trimmed;
-        try {
-          host = new URL(trimmed).hostname;
-        } catch {
-          host = trimmed;
-        }
-        const cleanedHost = host.replace(/^www\./, "");
-        const friendlyLabels = {
-          "bpheadlessb746.wpenginepowered.com": "bpheadlessb746.wpenginepowered.com",
-        };
-        const label = friendlyLabels[cleanedHost] ?? cleanedHost;
-        return `Latest posts from ${label}`;
+        return "Latest posts from madisonsadler.com/posts";
       };
 
       const renderSparkline = (el, points, color = "#8b5e3c") => {
