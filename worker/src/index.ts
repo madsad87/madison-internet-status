@@ -450,7 +450,7 @@ async function fetchNowText(env: Env): Promise<NowSummary> {
   return summary;
 }
 
-async function fetchLighthouseScores(env: Env, force: boolean): Promise<LighthouseSummary | null> {
+async function fetchLighthouse(env: Env, force: boolean): Promise<LighthouseSummary | null> {
   if (!force && (await wasUpdatedRecently(env, "lighthouse:site", LIGHTHOUSE_UPDATE_FREQUENCY_SECONDS))) {
     const latest = await getLatest(env, "lighthouse:site");
     return latest ? (JSON.parse(latest.value_json) as LighthouseSummary) : null;
@@ -459,15 +459,19 @@ async function fetchLighthouseScores(env: Env, force: boolean): Promise<Lighthou
   const now = toEpochSeconds();
   const target = parseTargets(env)[0] ?? DEFAULT_TARGET;
   const apiKey = env.LIGHTHOUSE_API_KEY?.trim();
+  const cached = await getLatest(env, "lighthouse:site");
+  const cachedSummary = cached ? (JSON.parse(cached.value_json) as LighthouseSummary) : null;
 
   if (!apiKey) {
-    const summary: LighthouseSummary = {
-      url: target,
-      status: "unconfigured",
-      error: "LIGHTHOUSE_API_KEY is not set",
-      results: [],
-      checked_at: now,
-    };
+    const summary: LighthouseSummary = cachedSummary
+      ? { ...cachedSummary, checked_at: now }
+      : {
+        url: target,
+        status: "unconfigured",
+        error: "LIGHTHOUSE_API_KEY is not set",
+        results: [],
+        checked_at: now,
+      };
     await setLatest(env, "lighthouse:site", summary, now);
     await addHistory(env, "lighthouse:site", summary, now);
     return summary;
@@ -516,6 +520,18 @@ async function fetchLighthouseScores(env: Env, force: boolean): Promise<Lighthou
     checked_at: now,
   };
 
+  if (results.length === 0 && cachedSummary) {
+    const fallback: LighthouseSummary = {
+      ...cachedSummary,
+      status: "error",
+      error: summary.error,
+      checked_at: now,
+    };
+    await setLatest(env, "lighthouse:site", fallback, now);
+    await addHistory(env, "lighthouse:site", fallback, now);
+    return fallback;
+  }
+
   await setLatest(env, "lighthouse:site", summary, now);
   await addHistory(env, "lighthouse:site", summary, now);
 
@@ -538,7 +554,7 @@ async function fetchIncidentLog(env: Env): Promise<Array<Record<string, unknown>
 async function refreshAll(env: Env, force: boolean): Promise<void> {
   await fetchUptime(env, force);
   await fetchPerformance(env, force);
-  await fetchLighthouseScores(env, force);
+  await fetchLighthouse(env, force);
   await fetchGithub(env, force);
   await fetchPosts(env, force);
   await fetchNowText(env);
