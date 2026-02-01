@@ -173,6 +173,21 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
         margin-top: 1rem;
       }
 
+      .score-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem 1.4rem;
+      }
+
+      .score-grid .metric {
+        font-size: 1.6rem;
+        margin: 0;
+      }
+
+      .score-grid .meta {
+        margin: 0;
+      }
+
       .list {
         list-style: none;
         padding: 0;
@@ -315,12 +330,28 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
           <svg class="sparkline" id="uptime-sparkline" viewBox="0 0 120 40"></svg>
         </article>
 
-        <article class="card" data-modal-key="perf:site" aria-labelledby="perf-title">
-          <h2 id="perf-title">Performance</h2>
-          <p class="metric" id="perf-latest">--</p>
-          <p class="meta" id="perf-average">Rolling average: --</p>
-          <p class="meta" id="perf-meta">Last check: --</p>
-          <svg class="sparkline" id="perf-sparkline" viewBox="0 0 120 40"></svg>
+        <article class="card" data-modal-key="lighthouse:site" aria-labelledby="lighthouse-title">
+          <h2 id="lighthouse-title">Lighthouse Scores</h2>
+          <div class="score-grid">
+            <div>
+              <p class="meta">Performance</p>
+              <p class="metric" id="lighthouse-performance">--</p>
+            </div>
+            <div>
+              <p class="meta">Accessibility</p>
+              <p class="metric" id="lighthouse-accessibility">--</p>
+            </div>
+            <div>
+              <p class="meta">Best practices</p>
+              <p class="metric" id="lighthouse-best-practices">--</p>
+            </div>
+            <div>
+              <p class="meta">SEO</p>
+              <p class="metric" id="lighthouse-seo">--</p>
+            </div>
+          </div>
+          <p class="meta" id="lighthouse-meta">Last audit: --</p>
+          <svg class="sparkline" id="lighthouse-sparkline" viewBox="0 0 120 40"></svg>
         </article>
 
         <article class="card" aria-labelledby="github-title">
@@ -380,6 +411,43 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
       };
 
       const formatLatency = (value) => (value == null ? "--" : `${Math.round(value)} ms`);
+      const formatScore = (value) => {
+        if (value == null) return "--";
+        const normalized = value <= 1 ? value * 100 : value;
+        return `${Math.round(normalized)}%`;
+      };
+
+      const resolveLighthouseCategories = (value) => {
+        if (!value) return null;
+        if (value.categories) return value.categories;
+        if (value.scores) return value.scores;
+        if (value.lighthouseResult?.categories) return value.lighthouseResult.categories;
+        if (value.result?.categories) return value.result.categories;
+        return value;
+      };
+
+      const getScoreValue = (value) => {
+        if (value == null) return null;
+        if (typeof value === "object" && "score" in value) {
+          return value.score;
+        }
+        return value;
+      };
+
+      const resolveLighthouseCategoryScore = (categories, keys) => {
+        for (const key of keys) {
+          const candidate = categories?.[key];
+          const value = getScoreValue(candidate);
+          if (value != null) return value;
+        }
+        return null;
+      };
+
+      const resolveLighthouseScore = (value) => {
+        if (!value) return null;
+        const categories = resolveLighthouseCategories(value);
+        return resolveLighthouseCategoryScore(categories, ["performance", "perf"]);
+      };
 
       const formatPostsSource = (source) => {
         if (!source || source === "placeholder") {
@@ -467,6 +535,11 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
             const ok = point.value.status === "ok";
             return { value: ok ? 1 : 0, time: point.recorded_at };
           }
+          if (key === "lighthouse:site") {
+            const score = resolveLighthouseScore(point.value) ?? 0;
+            const normalized = score <= 1 ? score * 100 : score;
+            return { value: normalized, time: point.recorded_at };
+          }
           const value = point.value.response_ms ?? point.value.rolling_avg_ms ?? 0;
           return { value, time: point.recorded_at };
         });
@@ -489,7 +562,7 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
         if (!card) return;
         const key = card.dataset.modalKey;
         if (!key) return;
-        const label = key === "uptime:site" ? "Uptime" : "Performance";
+        const label = key === "uptime:site" ? "Uptime" : "Lighthouse performance";
         openModal(key, label);
       });
 
@@ -510,7 +583,7 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
         const latestCheckedAt = Math.max(
           data.generated_at ?? 0,
           data.uptime?.checked_at ?? 0,
-          data.perf?.checked_at ?? 0,
+          data.lighthouse?.checked_at ?? 0,
           data.now?.updated_at ?? 0
         );
         document.getElementById("overall-updated").textContent = formatTime(latestCheckedAt);
@@ -529,10 +602,27 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
           document.getElementById("uptime-meta").textContent = `Last check: ${formatTime(data.uptime.checked_at)}`;
         }
 
-        if (data.perf) {
-          document.getElementById("perf-latest").textContent = formatLatency(data.perf.response_ms);
-          document.getElementById("perf-average").textContent = `Rolling average: ${formatLatency(data.perf.rolling_avg_ms)}`;
-          document.getElementById("perf-meta").textContent = `Last check: ${formatTime(data.perf.checked_at)}`;
+        if (data.lighthouse) {
+          const categories = resolveLighthouseCategories(data.lighthouse);
+          document.getElementById("lighthouse-performance").textContent = formatScore(
+            resolveLighthouseCategoryScore(categories, ["performance", "perf"])
+          );
+          document.getElementById("lighthouse-accessibility").textContent = formatScore(
+            resolveLighthouseCategoryScore(categories, ["accessibility", "a11y"])
+          );
+          document.getElementById("lighthouse-best-practices").textContent = formatScore(
+            resolveLighthouseCategoryScore(categories, [
+              "best_practices",
+              "bestPractices",
+              "best-practices",
+            ])
+          );
+          document.getElementById("lighthouse-seo").textContent = formatScore(
+            resolveLighthouseCategoryScore(categories, ["seo", "search"])
+          );
+          const auditedAt =
+            data.lighthouse.checked_at ?? data.lighthouse.audited_at ?? data.lighthouse.generated_at ?? 0;
+          document.getElementById("lighthouse-meta").textContent = `Last audit: ${formatTime(auditedAt)}`;
         }
 
         if (data.github) {
@@ -586,13 +676,17 @@ const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL ?? import.meta.env.API_BA
           renderSparkline(document.getElementById("uptime-sparkline"), points);
         }
 
-        const perfHistory = await fetch(buildApiUrl("/api/status/history?key=perf:site&range=24h"));
-        if (perfHistory.ok) {
-          const history = await perfHistory.json();
-          const points = (history.points || []).map((point) => ({
-            value: point.value.response_ms ?? point.value.rolling_avg_ms ?? 0,
-          }));
-          renderSparkline(document.getElementById("perf-sparkline"), points, "#6b4c34");
+        const lighthouseHistory = await fetch(
+          buildApiUrl("/api/status/history?key=lighthouse:site&range=24h")
+        );
+        if (lighthouseHistory.ok) {
+          const history = await lighthouseHistory.json();
+          const points = (history.points || []).map((point) => {
+            const score = resolveLighthouseScore(point.value) ?? 0;
+            const normalized = score <= 1 ? score * 100 : score;
+            return { value: normalized };
+          });
+          renderSparkline(document.getElementById("lighthouse-sparkline"), points, "#6b4c34");
         }
       };
 
