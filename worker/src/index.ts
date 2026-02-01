@@ -617,13 +617,16 @@ export default {
         getLatest(env, "now:text"),
         fetchIncidentLog(env),
       ]);
+      const lighthouseSummary = lighthouse
+        ? (JSON.parse(lighthouse.value_json) as LighthouseSummary)
+        : null;
 
       return jsonResponse(
         {
           generated_at: toEpochSeconds(),
           uptime: uptime ? JSON.parse(uptime.value_json) : null,
           perf: perf ? JSON.parse(perf.value_json) : null,
-          lighthouse: lighthouse ? JSON.parse(lighthouse.value_json) : null,
+          lighthouse: lighthouseSummary,
           github: github ? JSON.parse(github.value_json) : null,
           posts: posts ? JSON.parse(posts.value_json) : null,
           now: nowText ? JSON.parse(nowText.value_json) : null,
