@@ -341,21 +341,44 @@ async function fetchPosts(env: Env, force: boolean): Promise<PostsSummary | null
   const bodyText = await response.text();
   let items: PostsSummary["items"] = [];
 
-  const parseRssItems = (xmlText: string): PostsSummary["items"] => {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(xmlText, "text/xml");
-    const rssItems = Array.from(doc.querySelectorAll("item")).slice(0, 5);
-    return rssItems.map((item) => {
-      const title = item.querySelector("title")?.textContent?.trim() ?? "Untitled";
-      const url = item.querySelector("link")?.textContent?.trim() ?? "#";
-      const pubDate = item.querySelector("pubDate")?.textContent?.trim() ?? "";
+  const stripCdata = (value: string): string =>
+    value.replace(/<!\[CDATA\[(.*?)]]>/gis, "$1").trim();
+
+  const extractTag = (source: string, tag: string): string | null => {
+    const match = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "i").exec(source);
+    if (!match) return null;
+    return stripCdata(match[1]);
+  };
+
+  const extractLink = (source: string): string | null => {
+    const hrefMatch = /<link[^>]*href=["']([^"']+)["'][^>]*>/i.exec(source);
+    if (hrefMatch) return hrefMatch[1].trim();
+    return extractTag(source, "link");
+  };
+
+  const parseFeedItems = (xmlText: string, itemTag: string): PostsSummary["items"] => {
+    const regex = new RegExp(`<${itemTag}[^>]*>([\\s\\S]*?)</${itemTag}>`, "gi");
+    const items: PostsSummary["items"] = [];
+    for (const match of xmlText.matchAll(regex)) {
+      const chunk = match[1] ?? "";
+      const title = extractTag(chunk, "title") ?? "Untitled";
+      const url = extractLink(chunk) ?? "#";
+      const pubDate = extractTag(chunk, "pubDate") ?? extractTag(chunk, "updated") ?? "";
       const publishedAt = pubDate ? Date.parse(pubDate) : NaN;
-      return {
+      items.push({
         title,
         url,
         published_at: Number.isNaN(publishedAt) ? null : Math.floor(publishedAt / 1000),
-      };
-    });
+      });
+      if (items.length >= 5) break;
+    }
+    return items;
+  };
+
+  const parseRssItems = (xmlText: string): PostsSummary["items"] => {
+    const rssItems = parseFeedItems(xmlText, "item");
+    if (rssItems.length > 0) return rssItems;
+    return parseFeedItems(xmlText, "entry");
   };
 
   const isXmlContent = /(rss|xml|atom)/i.test(contentType);
