@@ -14,4 +14,4 @@ crons = ["*/5 * * * *"]
 GITHUB_USER = "madsad87"
 UPTIME_TARGETS = "https://madisonsadler.com/"
 POSTS_FEED_URL = "https://bpheadlessb746.wpenginepowered.com/feed/"
-
+LIGHTHOUSE_API_KEY = "replace-with-pagespeed-key"
