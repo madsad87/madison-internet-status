@@ -1,4 +1,4 @@
-name = "madison-internet-status"
+name = "madison-internet-status-api"
 main = "worker/src/index.ts"
 compatibility_date = "2024-04-01"
 
